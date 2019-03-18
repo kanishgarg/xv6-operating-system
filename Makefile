@@ -182,15 +182,12 @@ UPROGS=\
 	_usertests\
 	_wc\
 	_zombie\
-	_assig1_1\
 	_assig1_2\
-	_assig1_3\
-	_assig1_4\
 	_assig1_5\
-	_assig1_6\
-	_assig1_7\
 	_assig1_8\
 	_check\
+	_temp\
+	_jacob\
 	
 
 fs.img: mkfs README arr $(UPROGS)
@@ -264,15 +261,12 @@ EXTRA=\
 	printf.c umalloc.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\
-	assig1_1.c\
 	assig1_2.c\
-	assig1_3.c\
-	assig1_4.c\
 	assig1_5.c\
-	assig1_6.c\
-	assig1_7.c\
 	assig1_8.c\
 	check.c\
+	jacob.c\
+	temp.c\
 
 dist:
 	rm -rf dist
