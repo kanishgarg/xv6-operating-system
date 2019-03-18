@@ -22,6 +22,7 @@ int sys_sigsend(int dest_pid,int msg) {
 }
 
 int sys_send_multi(void) {
+  pushcli();
   int sender_pid,length;
   int arg3=0;
   int* rec_pids;
@@ -34,6 +35,7 @@ int sys_send_multi(void) {
   argint(3,&length);
   for(int i=0;i<length;i++)
     sys_sigsend(rec_pids[i],(int)msg);
+  popcli();
   return 0;
 }
 

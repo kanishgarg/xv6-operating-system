@@ -22,7 +22,7 @@ main(int argc, char **argv)
     int i = 0;
     while(1){
       i++; 
-      //printf(1,"%d  ",i);
+      printf(1,"%d  ",i);
     }
   } 
   else {
@@ -36,6 +36,12 @@ main(int argc, char **argv)
     printf(1, "signal sent and returned %d\n",r);
     sleep(5);
     r=send_multi(5,recids,(void*)msgarr,1);
+    printf(1, "signal sent and returned %d\n",r);
+        r=send_multi(5,recids,(void*)msgarr,1);
+    printf(1, "signal sent and returned %d\n",r);
+        r=send_multi(5,recids,(void*)msgarr,1);
+    printf(1, "signal sent and returned %d\n",r);
+        r=send_multi(5,recids,(void*)msgarr,1);
     printf(1, "signal sent and returned %d\n",r);
   }
   //printf(1, "Handled the signal and continued the program!\n");

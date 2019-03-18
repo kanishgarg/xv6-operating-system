@@ -515,26 +515,26 @@ scheduler(void)
       switchuvm(p);
       p->state = RUNNING;
       if(proc!= 0)
-    {
-      if(proc->size!=0){
-        memmove(&proc->oldTf, proc->tf, sizeof(struct trapframe));//backing up trap frame
-        proc->tf->esp -= (uint)&invoke_sigret_end - (uint)&invoke_sigret_start;
-        memmove((void*)proc->tf->esp, invoke_sigret_start, (uint)&invoke_sigret_end - (uint)&invoke_sigret_start);
-        int h=proc->h;
-        if(h==20)
-          h=0;
+      {
+        if(proc->size!=0&&((proc->tf->cs & 3) != DPL_USER)){
+          memmove(&proc->oldTf, proc->tf, sizeof(struct trapframe));//backing up trap frame
+          proc->tf->esp -= (uint)&invoke_sigret_end - (uint)&invoke_sigret_start;
+          memmove((void*)proc->tf->esp, invoke_sigret_start, (uint)&invoke_sigret_end - (uint)&invoke_sigret_start);
+          int h=proc->h;
+          if(h==20)
+            h=0;
 
-        *((int*)(proc->tf->esp - 4)) = (int)proc->signal_arr[h][1];
-        *((int*)(proc->tf->esp - 8)) = (int)proc->signal_arr[h][0];
-        *((int*)(proc->tf->esp - 12)) = proc->tf->esp; // sigret system call code address
-        proc->tf->esp -= 12;
-        proc->tf->eip = (uint)proc->sighandler; // trapret will resume into signal handler
-        proc->size=proc->size-1; // free the cstackframe
-        proc->h=h+1;
-        // if(proc->state==SLEEPING)
-        // proc->state=RUNNING;
+          *((int*)(proc->tf->esp - 4)) = (int)proc->signal_arr[h][1];
+          *((int*)(proc->tf->esp - 8)) = (int)proc->signal_arr[h][0];
+          *((int*)(proc->tf->esp - 12)) = proc->tf->esp; // sigret system call code address
+          proc->tf->esp -= 12;
+          proc->tf->eip = (uint)proc->sighandler; // trapret will resume into signal handler
+          proc->size=proc->size-1; // free the cstackframe
+          proc->h=h+1;
+          // if(proc->state==SLEEPING)
+          // proc->state=RUNNING;
+        }
       }
-    }
       swtch(&(c->scheduler), p->context);
       switchkvm();
 
@@ -740,23 +740,18 @@ int sigsend(int dest_pid, int msg) {
   }
   return -1; // dest_pid wan't found, meaning it's not a valid pid. return error
 sigsend_dest_pid_found:
-  // if (push(&p->cstack, proc->pid, dest_pid, value) == 0)
   acquire(&ptable.lock);
   if(p->size==20)
     return -1; // pending signal stack is full. return error
   int t=p->t;
   if(t==20)
     t=0;
-  // for(int i=0;i<MSG_SIZE;i++)
   int* message=(int*) msg;
-    p->signal_arr[t][0]=*message;
-    p->signal_arr[t][1]=*(message+1);
-  // cprintf("first %d\n", p->size);
+  p->signal_arr[t][0]=*message;
+  p->signal_arr[t][1]=*(message+1);
   p->size=p->size+1;
-  // cprintf("second %d\n", p->size);
   p->t=t+1;
   release(&ptable.lock);
-
   // cprintf("p->size=%d\n",p->size);
   return 0; // successful execution
 }
@@ -764,7 +759,7 @@ sigsend_dest_pid_found:
 void sigret(void) {
   struct proc *proc = myproc();
   memmove(proc->tf, &proc->oldTf, sizeof(struct trapframe));
-
+  cprintf("return called");
 }
 
 void sigpause(void) {
