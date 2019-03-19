@@ -493,7 +493,6 @@ void
 scheduler(void)
 {
   struct proc *p;
-  struct proc *proc;
   struct cpu *c = mycpu();
   c->proc = 0;
   
@@ -506,18 +505,35 @@ scheduler(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-
-    proc = p;
           // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
-      if(proc!= 0)
-      {
-        if(proc->size!=0&&((proc->tf->cs & 3) != DPL_USER)){
-          memmove(&proc->oldTf, proc->tf, sizeof(struct trapframe));//backing up trap frame
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
+    release(&ptable.lock);
+
+  }
+}
+
+void checkSignals(struct trapframe *tf){
+  struct proc* proc=myproc();
+  if (proc == 0)
+    return; // no proc is defined for this CPU
+  if ((tf->cs & 3) != DPL_USER)
+    return; // CPU isn't at privilege level 3, hence in user mode
+  if(proc->size==0)
+    return; // no pending signals
+  if(proc->sighandler == (sig_handler)-1)
+    return; // default signal handler, ignore the signal
+  memmove(&proc->oldTf, proc->tf, sizeof(struct trapframe));//backing up trap frame
           proc->tf->esp -= (uint)&invoke_sigret_end - (uint)&invoke_sigret_start;
           memmove((void*)proc->tf->esp, invoke_sigret_start, (uint)&invoke_sigret_end - (uint)&invoke_sigret_start);
           int h=proc->h;
@@ -531,20 +547,6 @@ scheduler(void)
           proc->tf->eip = (uint)proc->sighandler; // trapret will resume into signal handler
           proc->size=proc->size-1; // free the cstackframe
           proc->h=h+1;
-          // if(proc->state==SLEEPING)
-          // proc->state=RUNNING;
-        }
-      }
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-    }
-    release(&ptable.lock);
-
-  }
 }
 
 // Enter scheduler.  Must hold only ptable.lock
@@ -759,7 +761,7 @@ sigsend_dest_pid_found:
 void sigret(void) {
   struct proc *proc = myproc();
   memmove(proc->tf, &proc->oldTf, sizeof(struct trapframe));
-  cprintf("return called");
+  // cprintf("return called");
 }
 
 void sigpause(void) {

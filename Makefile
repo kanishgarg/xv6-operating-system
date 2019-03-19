@@ -188,6 +188,7 @@ UPROGS=\
 	_check\
 	_temp\
 	_jacob\
+	_maekawa\
 	
 
 fs.img: mkfs README arr $(UPROGS)
@@ -267,6 +268,7 @@ EXTRA=\
 	check.c\
 	jacob.c\
 	temp.c\
+	maekawa.c\
 
 dist:
 	rm -rf dist

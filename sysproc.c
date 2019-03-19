@@ -14,28 +14,26 @@ int sys_sigset(void) {
 }
 
 int sys_sigsend(int dest_pid,int msg) {
-  // argint(0, &dest_pid);
-  // int arg3=0;
-  // argint(1, &arg3);
-  // msg=(int*)arg3;
+  argint(0, &dest_pid);
+  argint(1, &msg);
   return sigsend(dest_pid, msg);
 }
 
 int sys_send_multi(void) {
-  pushcli();
-  int sender_pid,length;
-  int arg3=0;
-  int* rec_pids;
-  int* msg;
-  argint(0, &sender_pid);
-  argint(1, &arg3);
-  rec_pids=(int*)arg3;
-  argint(2,&arg3);
-  msg=(int*)arg3;
-  argint(3,&length);
-  for(int i=0;i<length;i++)
-    sys_sigsend(rec_pids[i],(int)msg);
-  popcli();
+  // pushcli();
+  // int sender_pid,length;
+  // int arg3=0;
+  // int* rec_pids;
+  // int* msg;
+  // argint(0, &sender_pid);
+  // argint(1, &arg3);
+  // rec_pids=(int*)arg3;
+  // argint(2,&arg3);
+  // msg=(int*)arg3;
+  // argint(3,&length);
+  // for(int i=0;i<length;i++)
+  //   sys_sigsend(rec_pids[i],(int)msg);
+  // popcli();
   return 0;
 }
 

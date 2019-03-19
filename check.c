@@ -2,10 +2,11 @@
 #include "stat.h"
 #include "user.h"
 // #include "signal.h"
-
+int d=0;
 void handler(int sender,int data) {
   printf(1, "handler called!.sender=%d data=%d\n", sender,data);
-  // exit();
+  d=data;
+  exit();
   // return;
 }
 
@@ -22,7 +23,13 @@ main(int argc, char **argv)
     int i = 0;
     while(1){
       i++; 
-      printf(1,"%d  ",i);
+      // printf(1,"%d  ",i);
+      // if(i==1000)
+      // {
+      //   printf(1,"data=%d\n",d);
+      //    exit();
+      // }
+       
     }
   } 
   else {
@@ -34,18 +41,11 @@ main(int argc, char **argv)
     msgarr[1]=5962;
     int r=send_multi(5,recids,(void*)msgarr,1);
     printf(1, "signal sent and returned %d\n",r);
-    sleep(5);
-    r=send_multi(5,recids,(void*)msgarr,1);
-    printf(1, "signal sent and returned %d\n",r);
-        r=send_multi(5,recids,(void*)msgarr,1);
-    printf(1, "signal sent and returned %d\n",r);
-        r=send_multi(5,recids,(void*)msgarr,1);
-    printf(1, "signal sent and returned %d\n",r);
-        r=send_multi(5,recids,(void*)msgarr,1);
-    printf(1, "signal sent and returned %d\n",r);
   }
   //printf(1, "Handled the signal and continued the program!\n");
 
   wait();
+  printf(1, "Handled the signal and continued the program!\n");
+
   exit();
 }
