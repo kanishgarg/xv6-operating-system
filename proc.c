@@ -80,24 +80,28 @@ static void wakeup1(void *chan);
 
 int send(void)
 {
-
+  acquire(&ptable.lock);
   int sender_pid, rec_pid;
   char* msg;
   argint(0,&sender_pid);
   argint(1,&rec_pid);
   if(argstr(2,&msg) < 0) {return -1;}
   argstr(2,&msg);
-  if(process_Qs[rec_pid].size >= (50)){
-    return -1;
-  }
   struct proc *p;
   int idx=0;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++,idx++)
+  {
     if(p->pid ==rec_pid)
       break;
-
+  }
+  if(idx==NPROC)
+    cprintf("idx==NPROC\n");
   p = &ptable.proc[idx];
-  acquire(&ptable.lock);
+  if(process_Qs[idx].size >= (50)){
+    cprintf("processQ is full\n");
+    release(&ptable.lock);
+    return -1;
+  }
   int i = 0;
   int tail = process_Qs[idx].t;
   if(tail==50)
@@ -118,23 +122,23 @@ int send(void)
 
 int recv(void)
 {
+  acquire(&ptable.lock);
   char* msg;
   int rec_pid = myproc()->pid;
   if(argstr(0,&msg) < 0) {return -1;}
   argstr(0,&msg);
-
   struct proc *p;
   int idx=0;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++,idx++)
+  {
     if(p->pid ==rec_pid)
       break;
+  }
   p = &ptable.proc[idx];
-  acquire(&ptable.lock);
   if(process_Qs[idx].size <= 0){
     p->state=SLEEPING;
     sched();
   }
-  release(&ptable.lock);
   int h = process_Qs[idx].h;
   if(h==50)
     h=0;
@@ -142,7 +146,8 @@ int recv(void)
     *(msg + i) =  process_Qs[idx].mq[h][i]; 
   }
   process_Qs[idx].h=h+1;
-  process_Qs[idx].size -= 1;
+  process_Qs[idx].size =process_Qs[idx].size- 1;
+  release(&ptable.lock);
   return 0;
 }
 
@@ -243,8 +248,8 @@ allocproc(void)
   char *sp;
 
   acquire(&ptable.lock);
-
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  int idx=0;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++,idx++)
     if(p->state == UNUSED)
       goto found;
 
@@ -257,6 +262,9 @@ found:
   p->t=0;
   p->h=0;
   p->size=0;
+  process_Qs[idx].h=0;
+  process_Qs[idx].t=0;
+  process_Qs[idx].size=0;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -765,6 +773,16 @@ void sigret(void) {
 }
 
 void sigpause(void) {
+  acquire(&ptable.lock);
+  int rec_pid = myproc()->pid;
+  struct proc *p;
+  int idx=0;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++,idx++)
+  {
+    if(p->pid ==rec_pid)
+      break;
+  }
+  cprintf("Qsize=%d and head=%d and tail=%d\n",process_Qs[idx].size,process_Qs[idx].h,process_Qs[idx].t);
   // //acquire(&ptable.lock);
   // pushcli();
   // struct proc* proc=myproc();
@@ -789,6 +807,6 @@ void sigpause(void) {
   // //   if(!cas(&proc->state, SLEEPING, RUNNING))
   // //     panic("sigpause: cas #2 failed");
   // // }
-  // //release(&ptable.lock);
+  release(&ptable.lock);
   // popcli();
 }

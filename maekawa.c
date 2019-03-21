@@ -3,10 +3,10 @@
 #include "user.h"
 
 
-#define P 16
-#define P1 5
-#define P2 5
-#define P3 6
+#define P 25
+#define P1 0
+#define P2 12
+#define P3 13
 
 #define REQUEST 1
 #define LOCKED 2
@@ -15,27 +15,16 @@
 #define RELINQUISH 5
 #define INQUIRE 6
 
-int waitingQ[30];
-int size;
-int t;
-int locked;
-int locked_by;
-int inquired_someone;
-int pid;
 int ppid;
-int locked_count;
-int failedQ[30];
-int inquireQ[10];
-int failedQ_size;
-int inquireQ_size;
-int failedQ_tail;
-int inquireQ_tail;
 
-int deque_min()
+int deque_min(int* waitingQ,int* sizeadd)
 {
+    int size=*sizeadd;
     int count=0;
-    int min_id=100;
+    int min_id=10000;
     int idx=0;
+    if(size==0)
+        printf(1,"waitingQ size is zero\n");
     for(int i=0;i<30;i++)
     {
         if(waitingQ[i]!=0)
@@ -52,6 +41,9 @@ int deque_min()
     }
     waitingQ[idx]=0;
     size--;
+    *sizeadd=size;
+    // if(min_id>19)
+    // printf(1,"min_id=%d\n",min_id);
     return min_id;
 }
 struct msg{
@@ -68,15 +60,63 @@ int sqrt(int n)
     }
     return i;
 }
-void acquirelock(int* peers,int num_peers)
+void acquirelock(int* peers,int num_peers,int* waitingQ,int* sizeadd,int* tadd,int pid)
 {
-    struct msg message;
-    message.senderid=pid;
-    message.val=REQUEST;
+    int locked=0;
+    int locked_by=0;
+    int inquired_someone=0;
+    int count=0;
+    int size=*sizeadd;
+    int t=*tadd;
+    int inquireQ[30];
+    int failedQ[30];
+    int failedQ_size=0;
+    int inquireQ_size=0;
+    int failedQ_tail=0;
+    int inquireQ_tail=0;
+    int locked_count=0;
+
     for(int i=0;i<num_peers;i++)
-    send(pid,peers[i],(void*)&message);
+    {
+        struct msg message3;
+        message3.senderid=pid;
+        message3.val=REQUEST;
+        send(pid,peers[i],(void*)&message3);
+    }
+    if(size!=0)
+    {
+        int min_id=deque_min(waitingQ,&size);
+        struct msg message2;
+        message2.val=LOCKED;
+        message2.senderid=pid;
+        send(pid,min_id,(void*)&message2);
+        locked=1;
+        locked_by=min_id;
+        if(size!=0)
+        {
+            struct msg message4;
+            message4.val=FAILED;
+            message4.senderid=pid;
+            int count=0;
+            for(int j=0;j<30;j++)
+            {
+                if(waitingQ[j]!=0)
+                {
+                    count++;
+                    send(pid,waitingQ[j],(void*)&message4);
+                }
+                if(count==size)
+                break;
+            }
+        }
+        // printf(1,"%d is locked by %d\n",pid,locked_by);
+    }
     while(1)
     {
+        count++;
+        if(t>=30)
+        printf(1,"kanish blunder kar diya tune\n");
+        struct msg message;
         recv((void*)&message);
         int sender_id=message.senderid;
         if(message.val==REQUEST)
@@ -89,22 +129,46 @@ void acquirelock(int* peers,int num_peers)
                 send(pid,message.senderid,(void*)&message2);
                 locked=1;
                 locked_by=sender_id;
+                // printf(1,"%d is locked by %d\n",pid,locked_by);
             }
             else
             {
-                if(t==30)
-                    t=0;
+                if(t>=30)
+                    printf(1,"waiting Q is full error\n");
+                int min_id=10000;
+                if(size>0)
+                {
+                    int count=0;
+                    for(int i=0;i<30;i++)
+                    {
+                        if(waitingQ[i]!=0)
+                        {
+                            count++;
+                            if(waitingQ[i]<min_id)
+                            min_id=waitingQ[i];
+                        }
+                        if(count==size)
+                        break;
+                    }
+                }
                 waitingQ[t++]=sender_id;
                 size++;
-                if(sender_id>locked_by)
+                if(min_id<sender_id||sender_id>locked_by)
                 {
                     struct msg message2;
                     message2.val=FAILED;
                     message2.senderid=pid;
                     send(pid,sender_id,(void*)&message2);
                 }
-                else
+                else if(min_id>sender_id&&sender_id<locked_by)
                 {
+                    if(min_id<locked_by)
+                    {
+                        struct msg message2;
+                        message2.val=FAILED;
+                        message2.senderid=pid;
+                        send(pid,min_id,(void*)&message2);   
+                    }
                     if(!inquired_someone)
                     {
                         struct msg message2;
@@ -115,9 +179,7 @@ void acquirelock(int* peers,int num_peers)
                     }
                 }
                 
-            }
-            
-            
+            }    
         }
         else if(message.val==RELEASE)
         {
@@ -127,26 +189,30 @@ void acquirelock(int* peers,int num_peers)
 
             if(size!=0)
             {
-                int min_id=deque_min();
+                int min_id=deque_min(waitingQ,&size);
                 struct msg message2;
                 message2.val=LOCKED;
                 message2.senderid=pid;
                 send(pid,min_id,(void*)&message2);
                 locked=1;
                 locked_by=min_id;
+                // printf(1,"%d is locked by %d\n",pid,locked_by);
             }
         }
         else if(message.val==RELINQUISH)
         {
             //relinquish
             inquired_someone=0;
-            int min_id=deque_min();
+            int min_id=deque_min(waitingQ,&size);
+            if(min_id>sender_id)
+                printf(1,"error with min_id=%d and sender id=%d\n",min_id,sender_id);
             struct msg message2;
             message2.val=LOCKED;
             message2.senderid=pid;
             send(pid,min_id,(void*)&message2);
             locked=1;
             locked_by=min_id;
+            // printf(1,"%d is locked by %d\n",pid,locked_by);
             waitingQ[t++]=sender_id;
             size++;
 
@@ -154,6 +220,12 @@ void acquirelock(int* peers,int num_peers)
         else if(message.val==LOCKED)
         {
             locked_count++;
+            if(locked_count==num_peers)
+            {
+                *sizeadd=size;
+                *tadd=t;
+                return;
+            }
             if(failedQ_size!=0)
             {
                 int count=0;
@@ -171,34 +243,57 @@ void acquirelock(int* peers,int num_peers)
                     break;
                 }
             }
-            
-            if(locked_count==num_peers)
-                return;
         }
         else if(message.val==FAILED)
         {
-            failedQ[failedQ_tail++]=sender_id;
-            failedQ_size++;
-            int j=0;
-            while(inquireQ_size!=0)
+            int count=0;
+            int failed=1;
+            for(int i=0;i<30;i++)
             {
-                struct msg message2;
-                message2.senderid=pid;
-                message2.val=RELINQUISH;
-                send(pid,inquireQ[j++],(void*)&message2);
-                inquireQ_size--;
+                if(failedQ[i]!=0)
+                {
+                    count++;
+                    if(failedQ[i]==sender_id)
+                    {
+                        failed=0;
+                        // printf(1,"failed\n");
+                        break;
+                    }
+                }
+                if(count==failedQ_size)
+                break;
             }
-            inquireQ_tail=0;
+            if(failed)
+            {
+                failedQ[failedQ_tail++]=sender_id;
+                failedQ_size++;
+                int j=0;
+                while(inquireQ_size!=0)
+                {
+                    struct msg message2;
+                    message2.senderid=pid;
+                    message2.val=RELINQUISH;
+                    failedQ[failedQ_tail++]=inquireQ[j];
+                    failedQ_size++;
+                    send(pid,inquireQ[j++],(void*)&message2);
+                    inquireQ_size--;
+                    locked_count--;    
+                }
+                inquireQ_tail=0;
+            }
         }
-        else
+        else if(message.val==INQUIRE)
         {
             //inquire
             if(failedQ_size!=0)
             {
+                locked_count--;
                 struct msg message2;
                 message2.senderid=pid;
                 message2.val=RELINQUISH;
                 send(pid,sender_id,(void*)&message2);
+                failedQ[failedQ_tail++]=sender_id;
+                failedQ_size++;
             }
             else
             {
@@ -207,19 +302,63 @@ void acquirelock(int* peers,int num_peers)
             }
             
         }
+        else
+        {
+            if(message.val!=INQUIRE)
+            printf(1,"message value=%d by %d in %d at count=%d\n",message.val,sender_id,pid,count);
+        }
+        
     }
 }
-void releaselock(int* peers,int num_peers)
+void releaselock(int* peers,int num_peers,int* waitingQ,int size,int t,int pid)
 {
-    struct msg message;
-    message.senderid=pid;
-    message.val=RELEASE;
+    struct msg message3;
+    message3.senderid=pid;
+    message3.val=RELEASE;
+    send(pid,ppid,(void*)&message3);
     for(int i=0;i<num_peers;i++)
-    send(pid,peers[i],(void*)&message);
-    int temp=0;
-    send(pid,ppid,(void*)&temp);
+    {
+        if(peers[i]!=pid)
+        send(pid,peers[i],(void*)&message3);
+    }
+    // printf(1,"entered releaselock\n");
+    int locked=0;
+    int locked_by=0;
+    int inquired_someone=0;
+
+    struct msg message;
+    if(size!=0)
+    {
+        int min_id=deque_min(waitingQ,&size);
+        struct msg message2;
+        message2.val=LOCKED;
+        message2.senderid=pid;
+        send(pid,min_id,(void*)&message2);
+        locked=1;
+        locked_by=min_id;
+        if(size!=0)
+        {
+            struct msg message4;
+            message4.val=FAILED;
+            message4.senderid=pid;
+            int count=0;
+            for(int j=0;j<30;j++)
+            {
+                if(waitingQ[j]!=0)
+                {
+                    count++;
+                    send(pid,waitingQ[j],(void*)&message4);
+                }
+                if(count==size)
+                break;
+            }
+        }
+        // printf(1,"%d is locked by %d\n",pid,locked_by);
+    }
     while(1)
     {
+        if(t>=30)
+        printf(1,"kanish blunder kar diya tune\n");
         recv((void*)&message);
         int sender_id=message.senderid;
         if(message.val==REQUEST)
@@ -232,22 +371,46 @@ void releaselock(int* peers,int num_peers)
                 send(pid,message.senderid,(void*)&message2);
                 locked=1;
                 locked_by=sender_id;
+                // printf(1,"%d is locked by %d\n",pid,locked_by);
             }
             else
             {
                 if(t==30)
                     t=0;
+                int min_id=10000;
+                if(size>0)
+                {
+                    int count=0;
+                    for(int i=0;i<30;i++)
+                    {
+                        if(waitingQ[i]!=0)
+                        {
+                            count++;
+                            if(waitingQ[i]<min_id)
+                            min_id=waitingQ[i];
+                        }
+                        if(count==size)
+                        break;
+                    }
+                }
                 waitingQ[t++]=sender_id;
                 size++;
-                if(sender_id>locked_by)
+                if(min_id<sender_id||sender_id>locked_by)
                 {
                     struct msg message2;
                     message2.val=FAILED;
                     message2.senderid=pid;
                     send(pid,sender_id,(void*)&message2);
                 }
-                else
+                else if(min_id>sender_id&&sender_id<locked_by)
                 {
+                    if(min_id<locked_by)
+                    {
+                        struct msg message2;
+                        message2.val=FAILED;
+                        message2.senderid=pid;
+                        send(pid,min_id,(void*)&message2);   
+                    }
                     if(!inquired_someone)
                     {
                         struct msg message2;
@@ -270,31 +433,34 @@ void releaselock(int* peers,int num_peers)
 
             if(size!=0)
             {
-                int min_id=deque_min();
+                int min_id=deque_min(waitingQ,&size);
                 struct msg message2;
                 message2.val=LOCKED;
                 message2.senderid=pid;
                 send(pid,min_id,(void*)&message2);
                 locked=1;
                 locked_by=min_id;
+                // printf(1,"%d is locked by %d\n",pid,locked_by);
             }
         }
         else if(message.val==RELINQUISH)
         {
             //relinquish
             inquired_someone=0;
-            int min_id=deque_min();
+            int min_id=deque_min(waitingQ,&size);
             struct msg message2;
             message2.val=LOCKED;
             message2.senderid=pid;
             send(pid,min_id,(void*)&message2);
             locked=1;
             locked_by=min_id;
+            // printf(1,"%d is locked by %d\n",pid,locked_by);
             waitingQ[t++]=sender_id;
             size++;
         }
         else if(sender_id==ppid)
         {
+            // printf(1,"exiting");
             exit();
         }
     }
@@ -302,11 +468,6 @@ void releaselock(int* peers,int num_peers)
 
 int main(int argc, char *argv[])
 {
-    //Ignore it
-    waitingQ[0]=0;
-    size=0;
-    t=0;
-    //
     ppid=getpid();
     int root_P=sqrt(P);
     int process_ids[P];
@@ -315,28 +476,47 @@ int main(int argc, char *argv[])
         int child=fork();
         if(child==0)
         {
+            int waitingQ[30];
+            for(int i=0;i<30;i++)
+                waitingQ[i]=0;
+            int size=0;
+            int t=0;
             int num_peers=2*root_P-1;
             int peers[num_peers];
-            locked=0;
-            failedQ_size=0;
-            inquireQ_size=0;
-            failedQ_tail=0;
-            inquireQ_tail=0;
-            peers[0]=0;
-            locked_by=peers[0];
-            inquired_someone=0;
-            pid=getpid();
-            for(int i=0;i<num_peers;i++)
+            int locked=0;
+            int locked_by=0;
+            int inquired_someone=0;
+            int pid=getpid();
+            if(k>=P1)
             {
-                int id;
-                recv((void*)&id);
-                peers[i]=id;
-                // printf(1,"process %d received peerid=%d\n",pid,id);
+                int i=0;
+                while(i<num_peers)
+                {
+                    struct msg peerid;
+                    recv((void*)&peerid);
+                    if(peerid.senderid==ppid)
+                    {
+                        peers[i]=peerid.val;
+                        i++;
+                    }
+                    else
+                    {
+                        waitingQ[t++]=peerid.senderid;
+                        size++;
+                    }
+                    
+                    // if(i==num_peers)
+                    // sigpause();
+                    //printf(1,"process %d received peerid=%d\n",pid,peerid.val);
+                }
             }
+            
             if(k<P1){
-                struct msg message;
                 while(1)
                 {
+                    // if(locked)
+                    //     printf(1,"%d is locked by %d\n",pid,locked_by);
+                    struct msg message;
                     recv((void*)&message);
                     int sender_id=message.senderid;
                     if(message.val==REQUEST)
@@ -349,22 +529,46 @@ int main(int argc, char *argv[])
                             send(pid,message.senderid,(void*)&message2);
                             locked=1;
                             locked_by=sender_id;
+                            // printf(1,"%d is locked by %d\n",pid,locked_by);
                         }
                         else
                         {
                             if(t==30)
-                                t=0;
+                                printf(1,"waiting Q full\n");
+                            int min_id=10000;
+                            if(size>0)
+                            {
+                                int count=0;
+                                for(int i=0;i<30;i++)
+                                {
+                                    if(waitingQ[i]!=0)
+                                    {
+                                        count++;
+                                        if(waitingQ[i]<min_id)
+                                        min_id=waitingQ[i];
+                                    }
+                                    if(count==size)
+                                    break;
+                                }
+                            }
                             waitingQ[t++]=sender_id;
                             size++;
-                            if(sender_id>locked_by)
+                            if(min_id<sender_id||sender_id>locked_by)
                             {
                                 struct msg message2;
                                 message2.val=FAILED;
                                 message2.senderid=pid;
                                 send(pid,sender_id,(void*)&message2);
                             }
-                            else
+                            else if(min_id>sender_id&&sender_id<locked_by)
                             {
+                                if(min_id<locked_by)
+                                {
+                                    struct msg message2;
+                                    message2.val=FAILED;
+                                    message2.senderid=pid;
+                                    send(pid,min_id,(void*)&message2);   
+                                }
                                 if(!inquired_someone)
                                 {
                                     struct msg message2;
@@ -387,32 +591,37 @@ int main(int argc, char *argv[])
 
                         if(size!=0)
                         {
-                            int min_id=deque_min();
+                            int min_id=deque_min(waitingQ,&size);
                             struct msg message2;
                             message2.val=LOCKED;
                             message2.senderid=pid;
                             send(pid,min_id,(void*)&message2);
                             locked=1;
                             locked_by=min_id;
+                            // printf(1,"%d is locked by %d\n",pid,locked_by);
                         }
                     }
                     else if(message.val==RELINQUISH)
                     {
                         //relinquish
                         inquired_someone=0;
-                        int min_id=deque_min();
+                        int min_id=deque_min(waitingQ,&size);
+                        if(min_id>sender_id)
+                            printf(1,"error with min_id=%d and sender id=%d\n",min_id,sender_id);
                         struct msg message2;
                         message2.val=LOCKED;
                         message2.senderid=pid;
                         send(pid,min_id,(void*)&message2);
                         locked=1;
                         locked_by=min_id;
+                        // printf(1,"%d is locked by %d\n",pid,locked_by);
                         waitingQ[t++]=sender_id;
                         size++;
 
                     }
                     else if(sender_id==ppid)
                     {
+                        // printf(1,"exiting process\n");
                         exit();
                     }
                 }
@@ -420,44 +629,52 @@ int main(int argc, char *argv[])
             }
             else if(k>=P1&&k<P1+P2)
             {
-                acquirelock(peers,num_peers);
+                acquirelock(peers,num_peers,waitingQ, &size,&t,pid);
                 printf(1,"lock acquired by category 2 process with id=%d\n",pid);
                 printf(1,"lock released by category 2 process with id=%d\n",pid);
-                releaselock(peers,num_peers);
+                releaselock(peers,num_peers,waitingQ,size,t,pid);
             }
             else
             {
-                acquirelock(peers,num_peers);
+                acquirelock(peers,num_peers,waitingQ,&size,&t,pid);
                 printf(1,"lock acquired by category 3 process with id=%d\n",pid);
                 sleep(2);
                 printf(1,"lock released by category 3 process with id=%d\n",pid);
-                releaselock(peers,num_peers);
+                releaselock(peers,num_peers,waitingQ,size,t,pid);
             }
-            int cmd;
-            recv((void*)&cmd);
-            exit();
         }
         else
         {
             process_ids[k]=child;
         }
     }
-    for(int i=0;i<P;i++)
+    for(int i=P1;i<P;i++)
     {
         int row_s=(i/root_P)*root_P;
+        // printf(1,"peers of process %d\n",process_ids[i]);
+        struct msg pmsg;
+        pmsg.senderid=ppid;
         for(int j=0;j<root_P;j++)
         {
+            pmsg.val=process_ids[row_s+j];
             if(row_s+j!=i)
-            send(ppid,process_ids[i], (void*)&process_ids[row_s+j]);
+            {
+                send(ppid,process_ids[i], (void*)&pmsg);
+                // printf(1,"peer_id=%d\n",pmsg.val);
+            }
         }
         int col_s=(i%root_P);
         for(int j=0;j<root_P;j++)
-        send(ppid,process_ids[i], (void*)&process_ids[col_s+j*root_P]);
+        {
+            pmsg.val=process_ids[col_s+j*root_P];
+            send(ppid,process_ids[i], (void*)&pmsg);
+            // printf(1,"peer_id=%d\n",pmsg.val);
+        }
     }
     for(int i=0;i<P2+P3;i++)
     {
-        int exit_msg;
-        recv((void*)&exit_msg);
+        struct msg message;
+        recv((void*)&message);
     }
     // printf(1,"ppid=%d\n",ppid);
     struct msg message;
