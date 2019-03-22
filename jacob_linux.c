@@ -1,18 +1,18 @@
-#include "types.h"
-#include "stat.h"
-#include "user.h"
+#include <stdio.h> 
+#include <stdlib.h>
+#include <sys/stat.h> 
+#include <fcntl.h>
+#include <sys/types.h> 
+#include <unistd.h> 
+#include <sys/wait.h> 
 
-
-// #define N 11
-// #define E 0.00001
-// #define T 100.0
-// #define P 3
-// #define L 2000
-int N;
-float E;
-float T;
-int P;
-int L;
+#define N 11
+#define E 0.00001
+#define T 100.0
+#define P 8
+#define L 2000
+char pipearr[P+1][11];
+int idarr[P+1];
 
 float fabsm(float a){
 	if(a<0)
@@ -23,8 +23,23 @@ struct msg{
     int senderid;
     float val;
 };
+void send(int sender_k,int receiver_k,void* msg1)
+{
+    if(write(idarr[receiver_k],msg1,8*sizeof(char))!=8)
+    {
+        struct msg* msg2=msg1;
+        printf("error in write\n");
+        printf("id=%d and msg1.val=%f and receiverk=%s\n",idarr[receiver_k],msg2->val,pipearr[receiver_k]);
+    }
+    // close(id);
+}
+void recv(int receiver_k,void* msg1)
+{
+    while(read(idarr[receiver_k],msg1,8*sizeof(char))<8); 
+}
+int works[P][2];
 int nWorkers;
-void scheduler(int works[][2]) {
+void scheduler() {
     nWorkers = P;
     int slice = (N-2)/nWorkers;
     int residual = N-2 - (nWorkers * slice);
@@ -43,63 +58,23 @@ void scheduler(int works[][2]) {
 }
 int main(int argc, char *argv[])
 {
-    if(argc< 2){
-        printf(1,"Need input filename\n");
-        exit();
-    }
-    char *filename;
-    filename = argv[1];
-    int fd = open(filename, 0);
-    char c;
-    float parameters[5];
-
-    for (int i = 0; i < 5; i++)
-    {
-        float figure = 0.0;
-        read(fd, &c, 1);
-        float tens = 10.0;
-        int decimal = 0;
-        while (c != '\n'&&c>0)
-        {
-            // printf(1, "%c\n", c);
-            if (c == '.')
-            {
-                decimal = 1;
-            }
-            else if (!decimal)
-            {
-                figure = 10*figure + (c - '0');
-            }
-            else
-            {
-                figure = figure + (c - '0')/tens;
-                tens = tens*10;
-            }
-            read(fd, &c, 1);
-        }
-        parameters[i] = figure;
-        // printf(1, "%d\n", (int)parameters[i]);
-    }
-
-    N = (int)parameters[0];
-    E = parameters[1];
-    T = parameters[2];
-    P = (int)parameters[3];
-    L = (int)parameters[4];
-    close(fd);
-    int works[P][2];
-
     int i,j,k;
+    for(i=0;i<=P;i++)
+    {
+        sprintf(pipearr[i],"pipearr%d",i);
+        mkfifo(pipearr[i], 0666);  
+        // printf("id=%s\n",pipearr[i]);
+    }
     if(N==1)
     {
-        printf(1,"%d\n",0);
-        exit();
+        printf("%d\n",0);
+        exit(0);
     }
 	float diff;
 	float mean;
 	float u[N][N];
 	float w[N][N];
-    scheduler(works);
+    scheduler();
 	int count=0;
 	mean = 0.0;
 	for (i = 0; i < N; i++){
@@ -117,22 +92,27 @@ int main(int argc, char *argv[])
     {
         for(i =0; i <N; i++){
             for(j = 0; j<N; j++)
-                printf(1,"%d ",((int)u[i][j]));
-            printf(1,"\n");
+                printf("%d ",((int)u[i][j]));
+            printf("\n");
         }
-        exit();
+        exit(0);
     }
-    int ppid=getpid();
+    int ppid=P;
     int recids[P];
-
+    int original_ppid=getpid();
     for(k=0;k<P;k++)
     {
         int child=fork();
+        for(i=0;i<=P;i++)
+        {
+            idarr[i]=open(pipearr[i],O_RDWR);
+        }
         if(child==0)
         {
             int s=works[k][0];
             int e=works[k][1];
-            int pid=getpid();
+            int original_pid=getpid();
+            int pid=k;
             while(1)
             {
                 diff = 0.0;
@@ -146,11 +126,12 @@ int main(int argc, char *argv[])
                 }
                 
                 count++;
-                float val=diff;
-                send(pid,ppid,(void*)&val);
-                int cmd;
-                recv((void*)&cmd);
-                if((int)cmd==0)
+                struct msg msg2;
+                msg2.val=diff;
+                msg2.senderid=pid;
+                send(pid,ppid,(void*)&msg2);
+                recv(pid,(void*)&msg2);
+                if((int)msg2.val==0)
                 {
                     int ns=s;
                     int ne=e;
@@ -160,10 +141,11 @@ int main(int argc, char *argv[])
                         ne=ne+1;
                     for(i =ns; i <ne; i++){
                         for(j = 0; j<N; j++)
-                            printf(1,"%d ",((int)u[i][j]));
-                        printf(1,"\n");
+                            printf("%d ",((int)u[i][j]));
+                        printf("\n");
                     }
-                    exit();
+                    // printf("process exiting\n");
+                    exit(0);
                 }
 
                 for (i =s; i< e; i++)	
@@ -176,7 +158,7 @@ int main(int argc, char *argv[])
                         for(j=1;j<N-1;j++)
                         {
                             struct msg msg1;
-                            recv((void*)&msg1);
+                            recv(pid,(void*)&msg1);
                             if(other_id==-1)
                                 other_id=msg1.senderid;
                             u[e][j]=msg1.val;
@@ -200,7 +182,7 @@ int main(int argc, char *argv[])
                         for(j=1;j<N-1;j++)
                         {
                             struct msg msg1;
-                            recv((void*)&msg1);
+                            recv(pid,(void*)&msg1);
                             u[s-1][j]=msg1.val;
                         }
                     }
@@ -217,7 +199,7 @@ int main(int argc, char *argv[])
                         for(j=0;j<2*N-4;j++)
                         {
                             struct msg msg1;
-                            recv((void*)&msg1);
+                            recv(pid,(void*)&msg1);
                             if(other_id==-1&&msg1.senderid!=recids[k-1])
                                 other_id=msg1.senderid;
 
@@ -242,7 +224,7 @@ int main(int argc, char *argv[])
         }
         else
         {
-            recids[k]=child;
+            recids[k]=k;
         }
     }
     while(1)
@@ -252,25 +234,33 @@ int main(int argc, char *argv[])
         count++;
         for (i=0;i<P;i++)
         {
-            float value;
-            recv((void*)&value);
-            if(value>maxdiff)
-                maxdiff=value;
+            struct msg msg1;
+            recv(ppid,(void*)&msg1);
+            if(msg1.val>maxdiff)
+                maxdiff=msg1.val;
         }
+        // printf("all msgs received and maxdiff=%f\n",maxdiff);
         if(maxdiff<= E || count > L){ 
             cmd=0;
+            int status;
+            struct msg msg1;
+            msg1.senderid=ppid;
+            msg1.val=cmd;
             for(i=0;i<P;i++)
             {
-                send(ppid,recids[i],(void*)&cmd);
-                wait();
+                send(ppid,recids[i],(void*)&msg1);
+                wait(&status);
             }
-            exit();
+            exit(0);
         }
         else
         {
+            struct msg msg1;
+            msg1.senderid=ppid;
+            msg1.val=cmd;
             for(i=0;i<P;i++)
             {
-                send(ppid,recids[i],(void*)&cmd);
+                send(ppid,recids[i],(void*)&msg1);
             }
         }
     }

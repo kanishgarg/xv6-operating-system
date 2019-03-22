@@ -3,10 +3,10 @@
 #include "user.h"
 
 
-#define N 3
+#define N 8
 #define E 0.00001
 #define T 100.0
-#define P 6
+#define P 2
 #define L 200000
 
 float fabsm(float a){

@@ -1,51 +1,64 @@
-#include "types.h"
-#include "stat.h"
-#include "user.h"
-// #include "signal.h"
-int d=0;
-void handler(int sender,int data) {
-  printf(1, "handler called!.sender=%d data=%d\n", sender,data);
-  d=data;
-  exit();
-  // return;
-}
+// #include <stdio.h> 
+// #include <stdlib.h>
+// #include <sys/stat.h> 
+// #include <fcntl.h>
+// #include <sys/types.h> 
+// #include <unistd.h> 
+// #include <sys/wait.h> 
+// char pipearr[2][10];
+// struct msg{
+//     int senderid;
+//     float val;
+// };
+// int
+// main(int argc, char **argv)
+// {
+//   int i;
+//   for(i=0;i<2;i++)
+//   {
+//       sprintf(pipearr[i],"pipearr%d",i);
+//       mkfifo(pipearr[i], 0666); 
+      
+//       printf("id=%s\n",pipearr[i]);
+//   }
+//   int ppid=getpid();
+//   for(int j=0;j<2;j++)
+//   {
+//     int child = fork();
+//     if (child == 0) {
+//       if(j==0)
+//       {
+//         struct msg msg1;
+//         msg1.val=4.895;
+//         msg1.senderid=3;
+//         int id=open(pipearr[1],O_WRONLY);
+//         id=open(pipearr[1],O_WRONLY);
+//         printf("id=%d\n",id);
+//         write(id,(void*)&msg1,8*sizeof(char));
+//         printf("written\n");
+//         // send(0,1,(void*)&a);
+//         exit(0);
+//       }
+//       else
+//       {
+//         struct msg msg1;
+//         int id=open(pipearr[1],O_RDONLY);
+//         printf("id=%d\n",id);
+//         while(read(id,(void*)&msg1,8*sizeof(char))!=8);
+//         // printf("received=%d\n",z);
+//         printf("%f %d\n",msg1.val,msg1.senderid);
+//         exit(0);
+//       }
+      
+        
+//     }
+//     else {
+//     }
+//   }
+//   //printf(1, "Handled the signal and continued the program!\n");
+//   int status;
+//   wait(&status);
+//   wait(&status);
 
-int
-main(int argc, char **argv)
-{
-  // int sum=5;
-  int ppid=getpid();
-  // * data=kanish";
-  sigset(&handler);
-  printf(1, "signal registered successfully\n");
-  int child = fork();
-  if (child == 0) {
-    int i = 0;
-    while(1){
-      i++; 
-      // printf(1,"%d  ",i);
-      // if(i==1000)
-      // {
-      //   printf(1,"data=%d\n",d);
-      //    exit();
-      // }
-       
-    }
-  } 
-  else {
-    printf(1, "%d is sending signal to %d\n",ppid,child);
-    int recids[1];
-    recids[0]=child;
-    int msgarr[2];
-    msgarr[0]=ppid;
-    msgarr[1]=5962;
-    int r=send_multi(5,recids,(void*)msgarr,1);
-    printf(1, "signal sent and returned %d\n",r);
-  }
-  //printf(1, "Handled the signal and continued the program!\n");
-
-  wait();
-  printf(1, "Handled the signal and continued the program!\n");
-
-  exit();
-}
+//   exit(0);
+// }
