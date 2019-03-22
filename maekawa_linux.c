@@ -5,11 +5,7 @@
 #include <sys/types.h> 
 #include <unistd.h> 
 #include <sys/wait.h> 
-
-#define P 9
-#define P1 2
-#define P2 6
-#define P3 1
+#include <time.h>
 
 #define REQUEST 1
 #define LOCKED 2
@@ -17,8 +13,13 @@
 #define FAILED 4
 #define RELINQUISH 5
 #define INQUIRE 6
-char pipearr[P+1][11];
-int idarr[P+1];
+
+int P;
+int P1;
+int P2;
+int P3;
+
+int* idarr;
 int ppid;
 
 int deque_min(int* waitingQ,int* sizeadd)
@@ -70,7 +71,6 @@ void send(int sender_k,int receiver_k,void* msg1)
     {
         struct msg* msg2=msg1;
         printf("error in write\n");
-        printf("id=%d and msg1.val=%d and receiverk=%s\n",idarr[receiver_k-1],msg2->val,pipearr[receiver_k-1]);
     }
     // close(id);
 }
@@ -486,7 +486,39 @@ void releaselock(int* peers,int num_peers,int* waitingQ,int size,int t,int pid)
 
 int main(int argc, char *argv[])
 {
+    if(argc< 2){
+        printf("Need input filename\n");
+        exit(0);
+    }
+    char *filename;
+    filename = argv[1];
+    int fd = open(filename, 0);
+    char c;
+    int parameters[4];
+
+    for (int i = 0; i < 4; i++)
+    {
+        int figure = 0;
+        read(fd, &c, 1);
+        while (c != '\n'&&c>0)
+        {
+            figure = 10*figure + (c - '0');
+            if(read(fd, &c, 1)==0)
+                break;
+        }
+        parameters[i] = figure;
+        // printf("%d\n", parameters[i]);
+    }
+
+    P =  parameters[0];
+    P1 = parameters[1];
+    P2 = parameters[2];
+    P3 = parameters[3];
+    close(fd);
+    char pipearr[P+1][11];
+    idarr=(int*)malloc((P+1)*sizeof(int));
     ppid=P+1;
+    int real_ppid=getpid();
     for(int i=0;i<=P;i++)
     {
         sprintf(pipearr[i],"pipearr%d",i);
@@ -515,6 +547,7 @@ int main(int argc, char *argv[])
             int locked_by=0;
             int inquired_someone=0;
             int pid=k+1;
+            int real_pid=getpid();
             if(k>=P1)
             {
                 int i=0;
@@ -535,15 +568,13 @@ int main(int argc, char *argv[])
                     
                     // if(i==num_peers)
                     // sigpause();
-                    //printf(1,"process %d received peerid=%d\n",pid,peerid.val);
+                    // printf("process %d received peerid=%d\n",pid,peerid.val);
                 }
             }
             
             if(k<P1){
                 while(1)
                 {
-                    // if(locked)
-                    //     printf(1,"%d is locked by %d\n",pid,locked_by);
                     struct msg message;
                     recv(pid,(void*)&message);
                     int sender_id=message.senderid;
@@ -658,16 +689,16 @@ int main(int argc, char *argv[])
             else if(k>=P1&&k<P1+P2)
             {
                 acquirelock(peers,num_peers,waitingQ, &size,&t,pid);
-                printf("lock acquired by category 2 process with id=%d\n",pid);
-                printf("lock released by category 2 process with id=%d\n",pid);
+                printf("%d acquired the lock at time %d\n",real_pid,(int)time(NULL));
+                printf("%d released the lock at time %d\n",real_pid,(int)time(NULL));
                 releaselock(peers,num_peers,waitingQ,size,t,pid);
             }
             else
             {
                 acquirelock(peers,num_peers,waitingQ,&size,&t,pid);
-                printf("lock acquired by category 3 process with id=%d\n",pid);
+                printf("%d acquired the lock at time %d\n",real_pid,(int)time(NULL));                
                 sleep(2);
-                printf("lock released by category 3 process with id=%d\n",pid);
+                printf("%d released the lock at time %d\n",real_pid,(int)time(NULL));
                 releaselock(peers,num_peers,waitingQ,size,t,pid);
             }
         }
@@ -715,5 +746,7 @@ int main(int argc, char *argv[])
         int status;
         wait(&status);
     }
+    for(int i=0;i<P+1;i++)
+    unlink(pipearr[i]);
     exit(0);
 }

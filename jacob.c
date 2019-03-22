@@ -75,7 +75,8 @@ int main(int argc, char *argv[])
                 figure = figure + (c - '0')/tens;
                 tens = tens*10;
             }
-            read(fd, &c, 1);
+            if(read(fd, &c, 1)==0)
+                break;
         }
         parameters[i] = figure;
         // printf(1, "%d\n", (int)parameters[i]);

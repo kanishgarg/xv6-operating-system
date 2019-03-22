@@ -6,13 +6,12 @@
 #include <unistd.h> 
 #include <sys/wait.h> 
 
-#define N 11
-#define E 0.00001
-#define T 100.0
-#define P 8
-#define L 2000
-char pipearr[P+1][11];
-int idarr[P+1];
+int N;
+float E;
+float T;
+int P;
+int L;
+int* idarr;
 
 float fabsm(float a){
 	if(a<0)
@@ -29,7 +28,6 @@ void send(int sender_k,int receiver_k,void* msg1)
     {
         struct msg* msg2=msg1;
         printf("error in write\n");
-        printf("id=%d and msg1.val=%f and receiverk=%s\n",idarr[receiver_k],msg2->val,pipearr[receiver_k]);
     }
     // close(id);
 }
@@ -37,9 +35,8 @@ void recv(int receiver_k,void* msg1)
 {
     while(read(idarr[receiver_k],msg1,8*sizeof(char))<8); 
 }
-int works[P][2];
 int nWorkers;
-void scheduler() {
+void scheduler(int works[][2]) {
     nWorkers = P;
     int slice = (N-2)/nWorkers;
     int residual = N-2 - (nWorkers * slice);
@@ -58,6 +55,54 @@ void scheduler() {
 }
 int main(int argc, char *argv[])
 {
+    if(argc< 2){
+        printf("Need input filename\n");
+        exit(0);
+    }
+    char *filename;
+    filename = argv[1];
+    int fd = open(filename, 0);
+    char c;
+    float parameters[5];
+
+    for (int i = 0; i < 5; i++)
+    {
+        float figure = 0.0;
+        read(fd, &c, 1);
+        float tens = 10.0;
+        int decimal = 0;
+        while (c != '\n'&&c>0)
+        {
+            // printf(1, "%c\n", c);
+            if (c == '.')
+            {
+                decimal = 1;
+            }
+            else if (!decimal)
+            {
+                figure = 10*figure + (c - '0');
+            }
+            else
+            {
+                figure = figure + (c - '0')/tens;
+                tens = tens*10;
+            }
+            if(read(fd, &c, 1)==0)
+                break;
+        }
+        parameters[i] = figure;
+        // printf(1, "%d\n", (int)parameters[i]);
+    }
+
+    N = (int)parameters[0];
+    E = parameters[1];
+    T = parameters[2];
+    P = (int)parameters[3];
+    L = (int)parameters[4];
+    close(fd);
+    char pipearr[P+1][10];
+    int works[P][2];
+    idarr=(int*)malloc((P+1)*sizeof(int));
     int i,j,k;
     for(i=0;i<=P;i++)
     {
@@ -74,7 +119,7 @@ int main(int argc, char *argv[])
 	float mean;
 	float u[N][N];
 	float w[N][N];
-    scheduler();
+    scheduler(works);
 	int count=0;
 	mean = 0.0;
 	for (i = 0; i < N; i++){
@@ -251,6 +296,8 @@ int main(int argc, char *argv[])
                 send(ppid,recids[i],(void*)&msg1);
                 wait(&status);
             }
+            for(int i=0;i<P+1;i++)
+                unlink(pipearr[i]);
             exit(0);
         }
         else

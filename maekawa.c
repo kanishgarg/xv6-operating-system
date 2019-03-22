@@ -1,12 +1,10 @@
 #include "types.h"
 #include "stat.h"
 #include "user.h"
-
-
-#define P 25
-#define P1 0
-#define P2 12
-#define P3 13
+int P;
+int P1;
+int P2;
+int P3;
 
 #define REQUEST 1
 #define LOCKED 2
@@ -42,8 +40,6 @@ int deque_min(int* waitingQ,int* sizeadd)
     waitingQ[idx]=0;
     size--;
     *sizeadd=size;
-    // if(min_id>19)
-    // printf(1,"min_id=%d\n",min_id);
     return min_id;
 }
 struct msg{
@@ -468,6 +464,35 @@ void releaselock(int* peers,int num_peers,int* waitingQ,int size,int t,int pid)
 
 int main(int argc, char *argv[])
 {
+    if(argc< 2){
+        printf(1,"Need input filename\n");
+        exit();
+    }
+    char *filename;
+    filename = argv[1];
+    int fd = open(filename, 0);
+    char c;
+    int parameters[4];
+
+    for (int i = 0; i < 4; i++)
+    {
+        int figure = 0;
+        read(fd, &c, 1);
+        while (c != '\n'&&c>0)
+        {
+            figure = 10*figure + (c - '0');
+            if(read(fd, &c, 1)==0)
+                break;
+        }
+        parameters[i] = figure;
+        // printf(1, "%d\n", parameters[i]);
+    }
+
+    P =  parameters[0];
+    P1 = parameters[1];
+    P2 = parameters[2];
+    P3 = parameters[3];
+    close(fd);
     ppid=getpid();
     int root_P=sqrt(P);
     int process_ids[P];
@@ -504,18 +529,12 @@ int main(int argc, char *argv[])
                         waitingQ[t++]=peerid.senderid;
                         size++;
                     }
-                    
-                    // if(i==num_peers)
-                    // sigpause();
-                    //printf(1,"process %d received peerid=%d\n",pid,peerid.val);
                 }
             }
             
             if(k<P1){
                 while(1)
                 {
-                    // if(locked)
-                    //     printf(1,"%d is locked by %d\n",pid,locked_by);
                     struct msg message;
                     recv((void*)&message);
                     int sender_id=message.senderid;
@@ -630,16 +649,16 @@ int main(int argc, char *argv[])
             else if(k>=P1&&k<P1+P2)
             {
                 acquirelock(peers,num_peers,waitingQ, &size,&t,pid);
-                printf(1,"lock acquired by category 2 process with id=%d\n",pid);
-                printf(1,"lock released by category 2 process with id=%d\n",pid);
+                printf(1,"%d acquired the lock at time %d\n",pid,uptime());
+                printf(1,"%d released the lock at time %d\n",pid,uptime());
                 releaselock(peers,num_peers,waitingQ,size,t,pid);
             }
             else
             {
                 acquirelock(peers,num_peers,waitingQ,&size,&t,pid);
-                printf(1,"lock acquired by category 3 process with id=%d\n",pid);
-                sleep(2);
-                printf(1,"lock released by category 3 process with id=%d\n",pid);
+                printf(1,"%d acquired the lock at time %d\n",pid,uptime());
+                sleep(200);
+                printf(1,"%d released the lock at time %d\n",pid,uptime());
                 releaselock(peers,num_peers,waitingQ,size,t,pid);
             }
         }

@@ -182,10 +182,6 @@ UPROGS=\
 	_usertests\
 	_wc\
 	_zombie\
-	_assig1_2\
-	_assig1_5\
-	_assig1_8\
-	_check\
 	_temp\
 	_jacob\
 	_maekawa\
@@ -262,10 +258,6 @@ EXTRA=\
 	printf.c umalloc.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\
-	assig1_2.c\
-	assig1_5.c\
-	assig1_8.c\
-	check.c\
 	jacob.c\
 	temp.c\
 	maekawa.c\
