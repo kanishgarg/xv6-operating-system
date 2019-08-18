@@ -1,5 +1,5 @@
 # XV6 OS
-## Implemented: System Calls, Inter Process Communication-Unicast, Multicast, signal handler, Deadlock prevention Algo: Maekava 
+## Implemented: System Calls, Inter Process Communication-Unicast, Multicast, signal handler,Jacobi parallel code, Deadlock prevention Algo: Maekava 
 
 
 xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
